@@ -1,0 +1,15 @@
+# Optional: deploy everything with: kubectl apply -k k8s/
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: ecommerce
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secret.yaml
+  - mongodb-deployment.yaml
+  - mysql-deployment.yaml
+  - product-service.yaml
+  - cart-service.yaml
+  - user-service.yaml
+  - order-service.yaml
+  - api-gateway.yaml

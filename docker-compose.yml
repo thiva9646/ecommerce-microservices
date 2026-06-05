@@ -1,0 +1,92 @@
+# Local development with Docker Compose (no Kubernetes required)
+# Run: docker compose up --build
+
+services:
+  mongodb:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: ecommerce
+      MYSQL_USER: ecommerce
+      MYSQL_PASSWORD: ecommerce123
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./mysql/init:/docker-entrypoint-initdb.d
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  product-service:
+    build: ./product-service
+    environment:
+      PORT: 3001
+      MONGO_URI: mongodb://mongodb:27017
+      MONGO_DB: ecommerce
+    depends_on:
+      - mongodb
+    ports:
+      - "3001:3001"
+
+  cart-service:
+    build: ./cart-service
+    ports:
+      - "3002:3002"
+
+  user-service:
+    build: ./user-service
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ecommerce
+      MYSQL_USER: ecommerce
+      MYSQL_PASSWORD: ecommerce123
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8081:80"
+
+  order-service:
+    build: ./order-service
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ecommerce
+      MYSQL_USER: ecommerce
+      MYSQL_PASSWORD: ecommerce123
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8082:80"
+
+  api-gateway:
+    build: ./api-gateway
+    environment:
+      PORT: 3000
+      PRODUCT_SERVICE_URL: http://product-service:3001
+      CART_SERVICE_URL: http://cart-service:3002
+      USER_SERVICE_URL: http://user-service
+      ORDER_SERVICE_URL: http://order-service
+    depends_on:
+      - product-service
+      - cart-service
+      - user-service
+      - order-service
+    ports:
+      - "3000:3000"
+
+volumes:
+  mongo_data:
+  mysql_data:

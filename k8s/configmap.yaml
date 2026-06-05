@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ecommerce-config
+  namespace: ecommerce
+data:
+  MONGO_DB: ecommerce
+  MYSQL_DATABASE: ecommerce
+  MYSQL_HOST: mysql
+  MYSQL_PORT: "3306"
+  PRODUCT_SERVICE_URL: http://product-service:3001
+  CART_SERVICE_URL: http://cart-service:3002
+  USER_SERVICE_URL: http://user-service
+  ORDER_SERVICE_URL: http://order-service
