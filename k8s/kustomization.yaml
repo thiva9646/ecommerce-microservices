@@ -13,3 +13,4 @@ resources:
   - user-service.yaml
   - order-service.yaml
   - api-gateway.yaml
+  - frontend.yaml

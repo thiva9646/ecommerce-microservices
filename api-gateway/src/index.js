@@ -1,19 +1,14 @@
 /**
- * API Gateway
- * ------------
- * Single entry point for the e-commerce app.
- * Routes incoming HTTP requests to the correct microservice.
- * In production you might add auth, rate limiting, and logging here.
+ * API Gateway — forwards /api/* to microservices
  */
 
 const express = require('express');
 const cors = require('cors');
-const { createProxyMiddleware } = require('http-proxy-middleware');
 
+const GATEWAY_VERSION = '2.0';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Service URLs — set via env (Docker/Kubernetes) or defaults for local dev
 const SERVICES = {
   products: process.env.PRODUCT_SERVICE_URL || 'http://localhost:3001',
   cart: process.env.CART_SERVICE_URL || 'http://localhost:3002',
@@ -24,15 +19,20 @@ const SERVICES = {
 app.use(cors());
 app.use(express.json());
 
-// Health check — Kubernetes uses this to know the pod is alive
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'api-gateway' });
+  res.json({ status: 'ok', service: 'api-gateway', version: GATEWAY_VERSION });
 });
 
-// API overview for learners
 app.get('/', (req, res) => {
   res.json({
-    message: 'E-commerce API Gateway',
+    status: 'ok',
+    version: GATEWAY_VERSION,
+    message: 'E-commerce API Gateway is running',
+    tryThese: [
+      'GET /api/products',
+      'GET /api/users',
+      'GET /health',
+    ],
     routes: {
       products: 'GET /api/products',
       productById: 'GET /api/products/:id',
@@ -44,34 +44,62 @@ app.get('/', (req, res) => {
 });
 
 /**
- * Proxy helper — forwards /api/... to each backend service.
- * pathRewrite strips /api prefix so backends see /products, /cart, etc.
+ * Build backend URL from full request path (no Express mount quirks).
+ * /api/products     -> http://product-service:3001/products
+ * /api/products/xyz -> http://product-service:3001/products/xyz
  */
-function proxy(target, pathRewrite) {
-  return createProxyMiddleware({
-    target,
-    changeOrigin: true,
-    pathRewrite,
-    onError: (err, req, res) => {
-      console.error('Proxy error:', err.message);
-      res.status(502).json({ error: 'Backend service unavailable', detail: err.message });
-    },
-  });
+function proxyMiddleware(serviceBase, apiPrefix, servicePrefix) {
+  return async (req, res, next) => {
+    if (!req.path.startsWith(apiPrefix)) {
+      return next();
+    }
+
+    const rest = req.path.slice(apiPrefix.length);
+    const queryIndex = req.originalUrl.indexOf('?');
+    const query = queryIndex >= 0 ? req.originalUrl.slice(queryIndex) : '';
+    const target = `${serviceBase}${servicePrefix}${rest}${query}`;
+
+    const headers = { Accept: 'application/json' };
+    if (req.headers['content-type']) {
+      headers['Content-Type'] = req.headers['content-type'];
+    }
+
+    const options = { method: req.method, headers };
+
+    if (!['GET', 'HEAD'].includes(req.method) && req.body && Object.keys(req.body).length > 0) {
+      options.body = JSON.stringify(req.body);
+    }
+
+    try {
+      const response = await fetch(target, options);
+      const contentType = response.headers.get('content-type') || 'application/json';
+      const body = await response.text();
+      res.status(response.status).type(contentType).send(body);
+    } catch (err) {
+      console.error(`Proxy error [${target}]:`, err.message);
+      res.status(502).json({
+        error: 'Backend service unavailable',
+        detail: err.message,
+        target,
+      });
+    }
+  };
 }
 
-// Product Service routes
-app.use('/api/products', proxy(SERVICES.products, { '^/api/products': '/products' }));
+app.use(proxyMiddleware(SERVICES.products, '/api/products', '/products'));
+app.use(proxyMiddleware(SERVICES.cart, '/api/cart', '/cart'));
+app.use(proxyMiddleware(SERVICES.users, '/api/users', '/users'));
+app.use(proxyMiddleware(SERVICES.orders, '/api/orders', '/orders'));
 
-// Cart Service routes
-app.use('/api/cart', proxy(SERVICES.cart, { '^/api/cart': '/cart' }));
-
-// User Service routes
-app.use('/api/users', proxy(SERVICES.users, { '^/api/users': '/users' }));
-
-// Order Service routes
-app.use('/api/orders', proxy(SERVICES.orders, { '^/api/orders': '/orders' }));
+app.use((req, res) => {
+  res.status(404).json({
+    error: 'Route not found',
+    path: req.originalUrl,
+    hint: 'Try GET /api/products or GET /api/users',
+  });
+});
 
 app.listen(PORT, () => {
-  console.log(`API Gateway running on port ${PORT}`);
+  console.log(`API Gateway v${GATEWAY_VERSION} on port ${PORT}`);
   console.log('Routing to:', SERVICES);
 });

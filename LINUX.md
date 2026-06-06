@@ -47,7 +47,8 @@ docker compose up --build -d
 ./scripts/test-api.sh
 ```
 
-Gateway: **http://localhost:3000**
+**Website:** **http://localhost:8080** (open in browser)  
+API Gateway: http://localhost:3000 (JSON only)
 
 ```bash
 docker compose logs -f          # logs

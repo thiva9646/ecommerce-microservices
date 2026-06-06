@@ -87,6 +87,14 @@ services:
     ports:
       - "3000:3000"
 
+  # Website UI — open this in the browser (not port 3000)
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - api-gateway
+
 volumes:
   mongo_data:
   mysql_data:

@@ -36,6 +36,11 @@ A beginner-friendly **microservices** sample app for learning **Docker**, **Kube
 
 No authentication — dummy data only, for local learning.
 
+| URL | Purpose |
+|-----|---------|
+| **http://localhost:8080** | **Website UI** (shop page — open this in browser) |
+| http://localhost:3000 | API Gateway (JSON only) |
+
 **Linux:** see [LINUX.md](LINUX.md)  
 **GitHub push/pull:** see [GITHUB.md](GITHUB.md) (use a Personal Access Token, not your account password)
 
